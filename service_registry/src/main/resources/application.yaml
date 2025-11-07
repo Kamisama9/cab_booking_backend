@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: SERVICE-REGISTRY
+  output:
+    ansi:
+      enabled: ALWAYS
+
+server:
+  port: 8761
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    com.netflix.eureka: OFF
+    com.netflix.discovery: OFF

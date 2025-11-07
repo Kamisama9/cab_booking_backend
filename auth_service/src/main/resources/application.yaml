@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: AUTH-SERVICE
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+  output:
+    ansi:
+      enabled: ALWAYS
+  web:
+    resources:
+      add-mappings: false
+ 
+
+server:
+  port: 8083
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+    include-exception: false
+
+# Eureka client configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    fetch-registry: true
+    register-with-eureka: true
+    registry-fetch-interval-seconds: 30
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 30
+    lease-expiration-duration-in-seconds: 90
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+
+# JWT configuration
+jwt:
+  secret: ${JWT_SECRET:mySecretKey12345sadsadkjksajdkjsalkdlksalkdmySecretKey12345}
+  expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
+
+# Feign client configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+        loggerLevel: full
+      USER-SERVICE:
+        connectTimeout: 10000
+        readTimeout: 10000
+  circuitbreaker:
+    enabled: false
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.cts.auth_service: DEBUG
+    com.cts.auth_service.client: DEBUG
+    com.cts.auth_service.service: DEBUG
+    com.cts.auth_service.controller: DEBUG
+    feign: DEBUG
+    org.springframework.security: INFO
+    org.springframework.cloud: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints (Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: false
