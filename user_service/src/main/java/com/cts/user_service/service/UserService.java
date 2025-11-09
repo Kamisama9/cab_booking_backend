@@ -7,7 +7,10 @@ import com.cts.user_service.entity.User;
 import com.cts.user_service.exception.*;
 import com.cts.user_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +20,6 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
@@ -25,12 +27,10 @@ public class UserService {
 
     @Transactional
     public String registerUser(SignupRequest request) {
-        log.info("Attempting to register user with email: {}", request.getEmail());
         validateSignupRequest(request);
 
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
         if (existingUser.isPresent()) {
-            log.warn("Registration failed: User already exists with email: {}", request.getEmail());
             throw new UserAlreadyExistsException("User already exists with email: " + request.getEmail());
         }
 
@@ -40,69 +40,61 @@ public class UserService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(parseRole(request.getRole()));
-        user.setStatus(User.Status.PENDING_VERIFICATION);
+        if(request.getRole().equals("RIDER"))
+        {
+            user.setStatus(User.Status.ACTIVE);
+        }
+        else
+        {
+            user.setStatus(User.Status.PENDING_VERIFICATION);
+        }
         user.setEmailVerified(false);
 
         User savedUser = userRepository.save(user);
-        log.info("User registered successfully with ID: {} and email: {}", savedUser.getId(), savedUser.getEmail());
         return "User registered successfully with ID: " + savedUser.getId();
     }
 
     public UserValidationResponse validateCredentials(LoginRequest req) {
-        log.info("Validating credentials for email: {}", req.getEmail());
         Optional<User> userOptional = userRepository.findByEmail(req.getEmail());
 
         if (!userOptional.isPresent()) {
-            log.warn("Login failed: User not found with email: {}", req.getEmail());
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
         User user = userOptional.get();
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            log.warn("Login failed: Invalid password for email: {}", req.getEmail());
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
         if (user.getStatus() == User.Status.SUSPENDED) {
-            log.warn("Login failed: Account suspended for email: {}", req.getEmail());
             throw new AccountSuspendedException("Your account has been suspended. Please contact support.");
         }
 
         if (user.getStatus() == User.Status.DELETED) {
-            log.warn("Login failed: Account deleted for email: {}", req.getEmail());
             throw new UserNotFoundException("Account does not exist");
         }
 
-        log.info("Credentials validated successfully for user ID: {}", user.getId());
         return new UserValidationResponse(user.getId(), user.getRole().name());
     }
 
     public User getUserById(String userId) {
-        log.debug("Fetching user by ID: {}", userId);
         return userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    log.error("User not found with ID: {}", userId);
-                    return new UserNotFoundException("User not found with ID: " + userId);
-                });
+                .orElseThrow(() -> new UserNotFoundException("User not found with ID: " + userId));
     }
 
     @Transactional
     public User updateUser(String userId, User updateRequest) {
-        log.info("Updating user with ID: {}", userId);
         User existingUser = getUserById(userId);
 
-        // Block password updates (should use separate endpoint)
         if (updateRequest.getPassword() != null) {
             throw new InvalidRequestException("Cannot update password through this endpoint. Use password reset.");
         }
 
-        // Block role updates (only admin should change roles)
         if (updateRequest.getRole() != null && updateRequest.getRole() != existingUser.getRole()) {
             throw new InvalidRequestException("Cannot change user role");
         }
 
-        // Block status updates (only admin/internal should change status)
         if (updateRequest.getStatus() != null && updateRequest.getStatus() != existingUser.getStatus()) {
             throw new InvalidRequestException("Cannot change user status");
         }
@@ -116,7 +108,6 @@ public class UserService {
         }
 
         if (updateRequest.getPhoneNumber() != null && !updateRequest.getPhoneNumber().trim().isEmpty()) {
-            // Validate phone number is unique
             if (!updateRequest.getPhoneNumber().equals(existingUser.getPhoneNumber())) {
                 if (userRepository.existsByPhoneNumber(updateRequest.getPhoneNumber())) {
                     throw new UserAlreadyExistsException("Phone number already in use");
@@ -133,46 +124,51 @@ public class UserService {
             existingUser.setState(updateRequest.getState().trim());
         }
 
-        User updatedUser = userRepository.save(existingUser);
-        log.info("User updated successfully with ID: {}", userId);
-        return updatedUser;
+        return userRepository.save(existingUser);
     }
 
     @Transactional
     public void updateUserStatus(String userId, User.Status newStatus) {
-        log.info("Updating status for user ID: {} to {}", userId, newStatus);
         User user = getUserById(userId);
         user.setStatus(newStatus);
         userRepository.save(user);
-        log.info("User status updated successfully for user ID: {}", userId);
     }
 
-
-    // Add these methods to UserService.java
-
+    // ✅ Existing methods (keep for backward compatibility)
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
-        log.info("Fetching all users");
         return userRepository.findAll();
     }
 
     @Transactional(readOnly = true)
     public List<User> getUsersByRole(User.Role role) {
-        log.info("Fetching users by role: {}", role);
         return userRepository.findByRole(role);
+    }
+
+    // ✅ NEW: Paginated methods
+    @Transactional(readOnly = true)
+    public Page<User> getAllUsersPaginated(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return userRepository.findAll(pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<User> getUsersByRolePaginated(User.Role role, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return userRepository.findByRole(role, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<User> getUsersByStatusPaginated(User.Status status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return userRepository.findByStatus(status, pageable);
     }
 
     @Transactional
     public void deleteUser(String userId) {
-        log.info("Deleting user: {}", userId);
         User user = getUserById(userId);
-
         user.setStatus(User.Status.DELETED);
         userRepository.save(user);
-
-
-
-        log.info("User deleted: {}", userId);
     }
 
     private void validateSignupRequest(SignupRequest request) {
@@ -188,13 +184,11 @@ public class UserService {
             throw new InvalidRequestException("First name is required");
         }
 
-        // Better email validation
         String emailRegex = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$";
         if (!request.getEmail().matches(emailRegex)) {
             throw new InvalidRequestException("Invalid email format");
         }
 
-        // Validate role if provided
         if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
             try {
                 User.Role.valueOf(request.getRole().toUpperCase());
@@ -203,6 +197,7 @@ public class UserService {
             }
         }
     }
+
     private User.Role parseRole(String roleStr) {
         if (roleStr == null || roleStr.trim().isEmpty()) {
             return User.Role.RIDER;

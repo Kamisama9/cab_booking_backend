@@ -20,8 +20,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(request -> request
-                        .requestMatchers("/api/v1/internal/**").permitAll()  // Internal calls
-                        .anyRequest().permitAll()  // Gateway already validated JWT
+                        .requestMatchers("/api/v1/internal/**").permitAll()  
+                        .anyRequest().permitAll()  
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS));

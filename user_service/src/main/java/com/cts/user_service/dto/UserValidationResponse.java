@@ -1,6 +1,5 @@
 package com.cts.user_service.dto;
 
-import com.cts.user_service.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

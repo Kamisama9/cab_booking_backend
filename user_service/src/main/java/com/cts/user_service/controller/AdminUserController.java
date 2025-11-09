@@ -4,6 +4,7 @@ import com.cts.user_service.entity.User;
 import com.cts.user_service.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,31 +21,64 @@ public class AdminUserController {
     private final UserService userService;
 
     /**
-     * Get all users (Admin only)
+     * Get all users (Admin only) - Legacy endpoint
      * GET /api/v1/admin/users
      */
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
-        log.info("Admin: Fetching all users");
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        
+        log.info("Admin: Fetching users - role: {}, status: {}, page: {}, size: {}", role, status, page, size);
+
+        // ✅ If pagination params are provided, use paginated response
+        if (page >= 0 && size > 0) {
+            if (role != null && !role.trim().isEmpty()) {
+                try {
+                    User.Role userRole = User.Role.valueOf(role.toUpperCase());
+                    Page<User> usersPage = userService.getUsersByRolePaginated(userRole, page, size);
+                    return new ResponseEntity<>(usersPage, HttpStatus.OK);
+                } catch (IllegalArgumentException e) {
+                    log.error("Invalid role: {}", role);
+                    return new ResponseEntity<>(
+                        Map.of("message", "Invalid role. Valid values: RIDER, DRIVER, ADMIN"),
+                        HttpStatus.BAD_REQUEST
+                    );
+                }
+            } else if (status != null && !status.trim().isEmpty()) {
+                try {
+                    User.Status userStatus = User.Status.valueOf(status.toUpperCase());
+                    Page<User> usersPage = userService.getUsersByStatusPaginated(userStatus, page, size);
+                    return new ResponseEntity<>(usersPage, HttpStatus.OK);
+                } catch (IllegalArgumentException e) {
+                    log.error("Invalid status: {}", status);
+                    return new ResponseEntity<>(
+                        Map.of("message", "Invalid status. Valid values: ACTIVE, SUSPENDED, PENDING_VERIFICATION, DELETED"),
+                        HttpStatus.BAD_REQUEST
+                    );
+                }
+            } else {
+                Page<User> usersPage = userService.getAllUsersPaginated(page, size);
+                return new ResponseEntity<>(usersPage, HttpStatus.OK);
+            }
+        }
+
+        // ✅ Legacy: If no pagination params, return full list
+        if (role != null && !role.trim().isEmpty()) {
+            try {
+                User.Role userRole = User.Role.valueOf(role.toUpperCase());
+                List<User> users = userService.getUsersByRole(userRole);
+                return new ResponseEntity<>(users, HttpStatus.OK);
+            } catch (IllegalArgumentException e) {
+                log.error("Invalid role: {}", role);
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+        }
+
         List<User> users = userService.getAllUsers();
         return new ResponseEntity<>(users, HttpStatus.OK);
-    }
-
-    /**
-     * Get users by role (Admin only)
-     * GET /api/v1/admin/users?role=RIDER
-     */
-    @GetMapping(params = "role")
-    public ResponseEntity<List<User>> getUsersByRole(@RequestParam String role) {
-        log.info("Admin: Fetching users by role: {}", role);
-        try {
-            User.Role userRole = User.Role.valueOf(role.toUpperCase());
-            List<User> users = userService.getUsersByRole(userRole);
-            return new ResponseEntity<>(users, HttpStatus.OK);
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid role: {}", role);
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
-        }
     }
 
     /**
