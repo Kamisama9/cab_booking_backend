@@ -41,18 +41,6 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    @ExceptionHandler(BookingAlreadyAssignedException.class)
-    public ResponseEntity<Map<String, Object>> handleBookingAlreadyAssigned(BookingAlreadyAssignedException ex) {
-        log.error("Booking already assigned: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
-    }
-
-    @ExceptionHandler(ActiveBookingExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleActiveBookingExists(ActiveBookingExistsException ex) {
-        log.error("Active booking exists: {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.CONFLICT, ex.getMessage());
-    }
-
     @ExceptionHandler(InvalidVehicleTypeException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidVehicleType(InvalidVehicleTypeException ex) {
         log.error("Invalid vehicle type: {}", ex.getMessage());

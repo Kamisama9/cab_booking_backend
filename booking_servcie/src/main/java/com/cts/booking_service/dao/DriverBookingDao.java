@@ -18,7 +18,4 @@ public interface DriverBookingDao {
     boolean hasActiveBooking(String driverId);
     List<Booking> findAvailableBookings();
     List<Booking> findAvailableBookingsByVehicleType(Booking.VehicleType vehicleType);
-    long getCompletedBookingCount(String driverId);
-    BigDecimal getTotalEarnings(String driverId);
-    List<Booking> findBookingsBetweenDates(String driverId, OffsetDateTime startDate, OffsetDateTime endDate);
 }

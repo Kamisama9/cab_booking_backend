@@ -7,6 +7,7 @@ spring:
 
   jackson:
     property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
 
   datasource:
     url: jdbc:mysql://localhost:3306/bookingdb?createDatabaseIfNotExist=true
@@ -19,6 +20,7 @@ spring:
       idle-timeout: 30000
       connection-timeout: 20000
       max-lifetime: 1800000
+      
   jpa:
     hibernate:
       ddl-auto: update
@@ -38,6 +40,13 @@ eureka:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
+# ✅ FIXED: Stripe Configuration (proper YAML format)
+stripe:
+  secret:
+    key: ${STRIPE_SECRET_KEY:sk_test_51SRoS3Rr44IaCvAFwCXxU3cA0jNsDgI6gW7pCaYCXxylFhwSXbRlnokQyivwwyzqu85amTQmJyFX2bcd82196CP400M4MvCv8U}
+  publishable:
+    key: ${STRIPE_PUBLISHABLE_KEY:pk_test_51SRoS3Rr44IaCvAFGx3O12UUuUfTm8KFe3UYEMaj13fdi3IDV4FWU0N9g0BqqyGJVxehXEeU8tSUy8bWwKg1r58O001q1J3P6J}
+
 # Feign client configuration
 feign:
   client:
@@ -50,4 +59,7 @@ feign:
 # Logging configuration
 logging:
   level:
+    com.cts.booking_service: DEBUG
     com.cts.booking_service.client: DEBUG
+    org.hibernate.SQL: DEBUG
+    com.stripe: DEBUG

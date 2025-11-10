@@ -1,6 +1,5 @@
 package com.cts.driver_service.controller;
 
-import com.cts.driver_service.dto.DriverAvailabilityRequest;
 import com.cts.driver_service.dto.DriverProfileRequest;
 import com.cts.driver_service.dto.DriverResponse;
 import com.cts.driver_service.entity.Driver;
@@ -81,34 +80,6 @@ public class DriverController {
         return ResponseEntity.ok(driver);
     }
 
-    /**
-     * Update driver availability
-     * PUT /api/v1/drivers/me/availability
-     * 
-     * Request Body:
-     * {
-     *   "isAvailable": true
-     * }
-     */
-    @PutMapping("/me/availability")
-    public ResponseEntity<Driver> setAvailability(
-            HttpServletRequest request,
-            @Valid @RequestBody DriverAvailabilityRequest availabilityRequest) {
-
-        String userId = extractUserId(request);
-        
-        log.info("Driver: Update availability request for userId: {} to {}", 
-                 userId, availabilityRequest.getIsAvailable());
-        
-        Driver driver = driverService.setAvailability(userId, availabilityRequest);
-        
-        log.info("Driver: Availability updated successfully for userId: {}", userId);
-        return ResponseEntity.ok(driver);
-    }
-
-    /**
-     * Helper method to extract userId from request header
-     */
     private String extractUserId(HttpServletRequest request) {
         String userId = request.getHeader("X-User-Id");
         if (userId == null || userId.isBlank()) {

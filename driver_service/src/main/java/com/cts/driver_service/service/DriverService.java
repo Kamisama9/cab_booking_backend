@@ -93,34 +93,6 @@ public class DriverService {
     }
 
     /**
-     * Update driver availability
-     */
-    @Transactional
-    public Driver setAvailability(String userId, DriverAvailabilityRequest req) {
-        log.info("Updating availability for userId: {} to {}", userId, req.getIsAvailable());
-        
-        Driver driver = driverRepository.findByUserId(userId)
-                .orElseThrow(() -> new DriverNotFoundException("Driver profile not found for userId: " + userId));
-
-        // Check if driver is approved before allowing to go online
-        if (driver.getVerificationStatus() != Driver.VerificationStatus.APPROVED) {
-            throw new DriverNotApprovedException(
-                "Your profile must be approved before going online. Current status: " + driver.getVerificationStatus()
-            );
-        }
-
-        driver.setAvailable(Boolean.TRUE.equals(req.getIsAvailable()));
-        Driver saved = driverRepository.save(driver);
-        
-        log.info("Availability updated successfully for userId: {}", userId);
-        return saved;
-    }
-
-    // ========================================
-    // ADMIN METHODS (returns DriverResponse with user details)
-    // ========================================
-
-    /**
      * Get all drivers with pagination
      */
     public Page<DriverResponse> listAll(Pageable pageable) {
@@ -243,8 +215,4 @@ public void deleteDriverById(String driverId) { // Rename method
     log.info("Deleted driver {}", driverId);
 }
 
-    public Object findById(String driverId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findById'");
-    }
 }

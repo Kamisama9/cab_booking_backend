@@ -19,11 +19,6 @@ import java.util.Map;
 public class AdminUserController {
 
     private final UserService userService;
-
-    /**
-     * Get all users (Admin only) - Legacy endpoint
-     * GET /api/v1/admin/users
-     */
     @GetMapping
     public ResponseEntity<?> getAllUsers(
             @RequestParam(required = false) String role,

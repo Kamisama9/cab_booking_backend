@@ -16,9 +16,9 @@ public class UserResponse {
     private String email;
     private String phoneNumber;
     private String city;
-    private String State;
+    private String state;  // Fixed: was "State"
     private String role;
-    private String Status;
+    private String status;  // Fixed: was "Status"
     private Boolean isEmailVerified;
     private LocalDate createdAt;
     private LocalDate updatedAt;

@@ -2,7 +2,6 @@ package com.cts.booking_service.controller;
 
 import com.cts.booking_service.dto.common.PageResponse;
 import com.cts.booking_service.dto.rider.RiderBookingResponse;
-import com.cts.booking_service.entity.Booking;
 import com.cts.booking_service.service.AdminBookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +27,7 @@ public class AdminBookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
 
-        log.info("Admin: Fetching all bookings (status: {}, page: {}, size: {})", status, page, size);
-
+        log.info("Admin fetching all bookings (status: {}, page: {}, size: {})", status, page, size);
         PageResponse<RiderBookingResponse> bookings = adminBookingService.getAllBookings(status, page, size);
         return new ResponseEntity<>(bookings, HttpStatus.OK);
     }
@@ -40,7 +38,7 @@ public class AdminBookingController {
      */
     @GetMapping("/{bookingId}")
     public ResponseEntity<RiderBookingResponse> getBookingById(@PathVariable String bookingId) {
-        log.info("Admin: Fetching booking: {}", bookingId);
+        log.info("Admin fetching booking: {}", bookingId);
         RiderBookingResponse booking = adminBookingService.getBookingById(bookingId);
         return new ResponseEntity<>(booking, HttpStatus.OK);
     }

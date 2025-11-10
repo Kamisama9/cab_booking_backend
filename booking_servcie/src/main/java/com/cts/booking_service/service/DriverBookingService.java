@@ -1,7 +1,7 @@
 package com.cts.booking_service.service;
 
 import com.cts.booking_service.client.UserServiceClient;
-import com.cts.booking_service.client.dto.UserResponse;
+import com.cts.booking_service.dto.UserResponse;
 import com.cts.booking_service.dao.DriverBookingDao;
 import com.cts.booking_service.dto.common.PageResponse;
 import com.cts.booking_service.dto.driver.*;
@@ -25,21 +25,21 @@ import java.util.stream.Collectors;
 public class DriverBookingService {
 
     private final DriverBookingDao driverBookingDao;
-
     private final UserServiceClient userServiceClient;
-
 
     @Transactional(readOnly = true)
     public List<DriverBookingResponse> getAvailableBookings(String driverId, String vehicleType) {
         log.info("Fetching available bookings for driver: {} (vehicleType: {})", driverId, vehicleType);
 
+        // Check if driver already has an active booking
         if (driverBookingDao.hasActiveBooking(driverId)) {
             log.warn("Driver {} already has an active booking", driverId);
-            throw new ActiveBookingExistsException("You already have an active booking. Complete it first before accepting new bookings.");
+            throw new InvalidBookingStatusException("You already have an active booking. Complete it first before accepting new bookings.");
         }
 
         List<Booking> bookings;
 
+        // Filter by vehicle type if specified
         if (vehicleType != null && !vehicleType.isBlank()) {
             try {
                 Booking.VehicleType type = Booking.VehicleType.valueOf(vehicleType.toUpperCase());
@@ -52,12 +52,14 @@ public class DriverBookingService {
             bookings = driverBookingDao.findAvailableBookings();
         }
 
-        log.info("Found {} available bookings", bookings.size());
+        log.info("Found {} available bookings for driver {}", bookings.size(), driverId);
 
+        // Convert to response DTOs
         List<DriverBookingResponse> responses = bookings.stream()
                 .map(DriverBookingResponse::fromEntity)
                 .collect(Collectors.toList());
 
+        // Populate rider details from User Service
         return populateRiderDetailsForList(responses);
     }
 
@@ -73,6 +75,7 @@ public class DriverBookingService {
 
         Page<Booking> bookingsPage;
 
+        // Apply status filter if provided
         if (status != null && !status.isBlank()) {
             try {
                 Booking.BookingStatus bookingStatus = Booking.BookingStatus.valueOf(status.toUpperCase());
@@ -85,7 +88,7 @@ public class DriverBookingService {
             bookingsPage = driverBookingDao.findAllByDriverId(driverId, page, size);
         }
 
-        // Convert to response
+        // Convert to response DTOs
         List<DriverBookingResponse> content = bookingsPage.getContent()
                 .stream()
                 .map(DriverBookingResponse::fromEntity)
@@ -94,6 +97,7 @@ public class DriverBookingService {
         // Populate rider details
         content = populateRiderDetailsForList(content);
 
+        // Build paginated response
         PageResponse<DriverBookingResponse> response = new PageResponse<>();
         response.setContent(content);
         response.setPage(bookingsPage.getNumber());
@@ -102,6 +106,7 @@ public class DriverBookingService {
         response.setTotalPages(bookingsPage.getTotalPages());
         response.setLast(bookingsPage.isLast());
 
+        log.info("Retrieved {} bookings for driver {}", content.size(), driverId);
         return response;
     }
 
@@ -126,17 +131,17 @@ public class DriverBookingService {
         // Check if driver already has an active booking
         if (driverBookingDao.hasActiveBooking(driverId)) {
             log.error("Driver {} already has an active booking", driverId);
-            throw new ActiveBookingExistsException("You already have an active booking. Complete it first before accepting new bookings.");
+            throw new InvalidBookingStatusException("You already have an active booking. Complete it first before accepting new bookings.");
         }
 
-        // Find booking
+        // Find and validate booking
         Booking booking = driverBookingDao.findById(bookingId)
                 .orElseThrow(() -> {
                     log.error("Booking not found: {}", bookingId);
                     return new BookingNotFoundException(bookingId, true);
                 });
 
-        // Validate booking status
+        // Validate booking is in PENDING status
         if (booking.getBookingStatus() != Booking.BookingStatus.PENDING) {
             log.error("Booking {} is not in PENDING status (current: {})",
                     bookingId, booking.getBookingStatus());
@@ -146,10 +151,10 @@ public class DriverBookingService {
         // Validate booking not already assigned
         if (booking.getDriverId() != null) {
             log.error("Booking {} already assigned to driver {}", bookingId, booking.getDriverId());
-            throw new BookingAlreadyAssignedException(bookingId, booking.getDriverId());
+            throw new InvalidBookingStatusException("This booking has already been assigned to another driver.");
         }
 
-        // Assign driver
+        // Assign driver and update booking
         booking.setDriverId(driverId);
         booking.setVehicleId(request.getVehicleId());
         booking.setBookingStatus(Booking.BookingStatus.ACCEPTED);
@@ -159,15 +164,9 @@ public class DriverBookingService {
 
         log.info("Booking {} accepted successfully by driver {}", bookingId, driverId);
 
-        // TODO: Notify rider that driver accepted
-        // TODO: Update driver availability in Driver Service (set to busy)
-
         DriverBookingResponse response = DriverBookingResponse.fromEntity(updated);
         return populateRiderDetails(response);
     }
-
-   // TODO: Don't accept ride
-
 
     @Transactional
     public DriverBookingResponse startRide(String bookingId, String driverId) {
@@ -192,21 +191,18 @@ public class DriverBookingService {
             throw new InvalidBookingStatusException("Cannot start ride. Booking must be in 'accepted' status. Current status: " + booking.getBookingStatus().name().toLowerCase());
         }
 
-        // Update booking
+        // Update booking to STARTED
         booking.setBookingStatus(Booking.BookingStatus.STARTED);
         booking.setPickupTime(OffsetDateTime.now());
         booking.setUpdatedAt(OffsetDateTime.now());
 
         Booking updated = driverBookingDao.save(booking);
 
-        log.info("Ride {} started successfully", bookingId);
-
-        // TODO: Notify rider that ride has started
+        log.info("Ride {} started successfully at {}", bookingId, updated.getPickupTime());
 
         DriverBookingResponse response = DriverBookingResponse.fromEntity(updated);
         return populateRiderDetails(response);
     }
-
 
     @Transactional
     public DriverBookingResponse completeRide(
@@ -235,7 +231,7 @@ public class DriverBookingService {
             throw new InvalidBookingStatusException("Cannot complete ride. Booking must be in 'started' status. Current status: " + booking.getBookingStatus().name().toLowerCase());
         }
 
-        // Update trip details
+        // Update trip details if provided
         if (request.getFinalDistanceKm() != null) {
             booking.setTripDistanceKm(request.getFinalDistanceKm());
         }
@@ -253,7 +249,7 @@ public class DriverBookingService {
             booking.setFareAmount(newFare);
         }
 
-        // Update status
+        // Update booking status
         booking.setBookingStatus(Booking.BookingStatus.COMPLETED);
         booking.setDropoffTime(OffsetDateTime.now());
         booking.setPaymentStatus(Booking.PaymentStatus.PENDING);
@@ -261,21 +257,12 @@ public class DriverBookingService {
 
         Booking updated = driverBookingDao.save(booking);
 
-        log.info("Ride {} completed successfully (Fare: {})", bookingId, booking.getFareAmount());
-
-        // TODO: Notify rider that ride is complete
-        // TODO: Trigger payment processing
-        // TODO: Make driver available again in Driver Service
+        log.info("Ride {} completed successfully (Fare: {}, Distance: {} km, Duration: {} min)", 
+                bookingId, booking.getFareAmount(), booking.getTripDistanceKm(), booking.getTripDurationMinutes());
 
         DriverBookingResponse response = DriverBookingResponse.fromEntity(updated);
         return populateRiderDetails(response);
     }
-
-    /**
-     * CANCEL BOOKING (by Driver)
-     */
-    // TODO: Implement cancellation with reasons and possible penalties
-    // TODO: Rate Rider
 
     @Transactional(readOnly = true)
     public DriverBookingResponse getBookingDetails(String bookingId, String driverId) {
@@ -297,7 +284,33 @@ public class DriverBookingService {
         return populateRiderDetails(response);
     }
 
-    // Helper method to fetch and populate rider details
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Calculate fare based on distance and vehicle type
+     */
+    private BigDecimal calculateFare(BigDecimal distance, Booking.VehicleType vehicleType) {
+        BigDecimal baseFare = switch (vehicleType) {
+            case AUTO -> BigDecimal.valueOf(50);
+            case BIKE -> BigDecimal.valueOf(50);
+            case SEDAN -> BigDecimal.valueOf(50);
+            case SUV -> BigDecimal.valueOf(70);
+        };
+
+        BigDecimal perKmRate = switch (vehicleType) {
+            case AUTO -> BigDecimal.valueOf(12);
+            case BIKE -> BigDecimal.valueOf(8);
+            case SEDAN -> BigDecimal.valueOf(15);
+            case SUV -> BigDecimal.valueOf(20);
+        };
+
+        return baseFare.add(distance.multiply(perKmRate))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Fetch and populate rider details from User Service
+     */
     private DriverBookingResponse populateRiderDetails(DriverBookingResponse response) {
         if (response.getRiderId() != null) {
             try {
@@ -320,25 +333,5 @@ public class DriverBookingService {
         return responses.stream()
                 .map(this::populateRiderDetails)
                 .collect(Collectors.toList());
-    }
-
-    // Helper method
-    private BigDecimal calculateFare(BigDecimal distance, Booking.VehicleType vehicleType) {
-        BigDecimal baseFare = switch (vehicleType) {
-            case AUTO -> BigDecimal.valueOf(30);
-            case BIKE -> BigDecimal.valueOf(20);
-            case SEDAN -> BigDecimal.valueOf(50);
-            case SUV -> BigDecimal.valueOf(70);
-        };
-
-        BigDecimal perKmRate = switch (vehicleType) {
-            case AUTO -> BigDecimal.valueOf(12);
-            case BIKE -> BigDecimal.valueOf(8);
-            case SEDAN -> BigDecimal.valueOf(15);
-            case SUV -> BigDecimal.valueOf(20);
-        };
-
-        return baseFare.add(distance.multiply(perKmRate))
-                .setScale(2, RoundingMode.HALF_UP);
     }
 }

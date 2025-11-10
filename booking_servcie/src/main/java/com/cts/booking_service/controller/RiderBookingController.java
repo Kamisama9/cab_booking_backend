@@ -5,6 +5,7 @@ import com.cts.booking_service.dto.rider.*;
 import com.cts.booking_service.exception.MissingHeaderException;
 import com.cts.booking_service.service.RiderBookingService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,10 +20,14 @@ public class RiderBookingController {
 
     private final RiderBookingService riderBookingService;
 
+    /**
+     * Create a new booking
+     * POST /api/v1/bookings
+     */
     @PostMapping
     public ResponseEntity<RiderBookingResponse> createBooking(
             HttpServletRequest httpRequest,
-            @RequestBody CreateBookingRequest request) {
+            @Valid @RequestBody CreateBookingRequest request) {
 
         String riderId = httpRequest.getHeader("X-User-Id");
 
@@ -31,9 +36,11 @@ public class RiderBookingController {
             throw new MissingHeaderException("X-User-Id");
         }
 
+        log.info("Rider {} creating booking", riderId);
         RiderBookingResponse booking = riderBookingService.createBooking(riderId, request);
         return new ResponseEntity<>(booking, HttpStatus.CREATED);
     }
+
 
     @GetMapping("/me")
     public ResponseEntity<PageResponse<RiderBookingResponse>> getMyBookings(
@@ -51,13 +58,17 @@ public class RiderBookingController {
             throw new MissingHeaderException("X-User-Id");
         }
 
+        log.info("Rider {} fetching bookings", riderId);
         PageResponse<RiderBookingResponse> bookings = riderBookingService.getMyBookings(
                 riderId, filterType, searchTerm, status, page, size
         );
         return new ResponseEntity<>(bookings, HttpStatus.OK);
     }
 
-
+    /**
+     * Get booking details by ID
+     * GET /api/v1/bookings/{bookingId}
+     */
     @GetMapping("/{bookingId}")
     public ResponseEntity<RiderBookingResponse> getBookingDetails(
             HttpServletRequest httpRequest,
@@ -70,23 +81,29 @@ public class RiderBookingController {
             throw new MissingHeaderException("X-User-Id");
         }
 
+        log.info("Rider {} fetching booking {}", riderId, bookingId);
         RiderBookingResponse booking = riderBookingService.getBookingDetails(bookingId, riderId);
         return new ResponseEntity<>(booking, HttpStatus.OK);
     }
 
-   //TODO: Cancel Booking
-   @PutMapping("/{bookingId}/cancel")
-   public ResponseEntity<RiderBookingResponse> cancelBooking(
-           HttpServletRequest httpRequest,
-           @PathVariable String bookingId) {
+    /**
+     * Cancel a booking
+     * PUT /api/v1/bookings/{bookingId}/cancel
+     */
+    @PutMapping("/{bookingId}/cancel")
+    public ResponseEntity<RiderBookingResponse> cancelBooking(
+            HttpServletRequest httpRequest,
+            @PathVariable String bookingId) {
 
-       String riderId = httpRequest.getHeader("X-User-Id");
-       if (riderId == null || riderId.isBlank()) {
-           throw new MissingHeaderException("X-User-Id");
-       }
+        String riderId = httpRequest.getHeader("X-User-Id");
+        
+        if (riderId == null || riderId.isBlank()) {
+            log.error("Missing X-User-Id header");
+            throw new MissingHeaderException("X-User-Id");
+        }
 
-       RiderBookingResponse booking = riderBookingService.cancelBooking(bookingId, riderId);
-       return new ResponseEntity<>(booking, HttpStatus.OK);
-   }
-   //TODO: Rate Driver
+        log.info("Rider {} cancelling booking {}", riderId, bookingId);
+        RiderBookingResponse booking = riderBookingService.cancelBooking(bookingId, riderId);
+        return new ResponseEntity<>(booking, HttpStatus.OK);
+    }
 }

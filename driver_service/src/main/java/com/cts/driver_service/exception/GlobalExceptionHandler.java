@@ -39,15 +39,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(DriverNotApprovedException.class)
-    public ResponseEntity<ErrorResponse> handleDriverNotApprovedException(DriverNotApprovedException ex) {
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.FORBIDDEN.value(),
-                "Forbidden",
-                ex.getMessage()
-        );
-        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
-    }
 
     @ExceptionHandler(InvalidDateFormatException.class)
     public ResponseEntity<ErrorResponse> handleInvalidDateFormatException(InvalidDateFormatException ex) {

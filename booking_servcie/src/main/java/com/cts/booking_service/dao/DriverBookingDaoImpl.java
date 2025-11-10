@@ -71,23 +71,4 @@ public class DriverBookingDaoImpl implements DriverBookingDao {
         log.debug("Finding available bookings for vehicle type: {}", vehicleType);
         return repository.findPendingBookingsByVehicleType(vehicleType);
     }
-
-    @Override
-    public long getCompletedBookingCount(String driverId) {
-        log.debug("Getting completed booking count for driver: {}", driverId);
-        return repository.countCompletedBookingsByDriverId(driverId);
-    }
-
-    @Override
-    public BigDecimal getTotalEarnings(String driverId) {
-        log.debug("Getting total earnings for driver: {}", driverId);
-        BigDecimal earnings = repository.getTotalEarningsByDriverId(driverId);
-        return earnings != null ? earnings : BigDecimal.ZERO;
-    }
-
-    @Override
-    public List<Booking> findBookingsBetweenDates(String driverId, OffsetDateTime startDate, OffsetDateTime endDate) {
-        log.debug("Finding bookings for driver: {} between {} and {}", driverId, startDate, endDate);
-        return repository.findDriverBookingsBetweenDates(driverId, startDate, endDate);
-    }
 }

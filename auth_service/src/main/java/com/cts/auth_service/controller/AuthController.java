@@ -4,32 +4,26 @@ import com.cts.auth_service.dto.AuthResponse;
 import com.cts.auth_service.dto.LoginRequest;
 import com.cts.auth_service.dto.SignupRequest;
 import com.cts.auth_service.service.AuthService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/v1/auth")
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
-
-    @Autowired
-    private AuthService authService;
+    private final AuthService authService;
 
     @PostMapping("/login")
-    //get email and password from request body to LoginRequest and return AuthResponse with token
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-
-        AuthResponse response = authService.login(request);
-        return new ResponseEntity<>(response, HttpStatus.OK);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 
     @PostMapping("/signup")
-    //get details from request body to SignupRequest and return success message
-    public ResponseEntity<String> signup(@RequestBody SignupRequest request) {
-        String response = authService.signup(request);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    public ResponseEntity<String> signup(@Valid @RequestBody SignupRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signup(request));
     }
-
 }

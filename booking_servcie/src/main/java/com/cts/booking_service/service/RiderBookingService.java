@@ -1,7 +1,7 @@
 package com.cts.booking_service.service;
 
 import com.cts.booking_service.client.UserServiceClient;
-import com.cts.booking_service.client.dto.UserResponse;
+import com.cts.booking_service.dto.UserResponse;
 import com.cts.booking_service.dao.RiderBookingDao;
 import com.cts.booking_service.dto.common.PageResponse;
 import com.cts.booking_service.dto.rider.*;
@@ -31,8 +31,8 @@ public class RiderBookingService {
     public RiderBookingResponse createBooking(String riderId, CreateBookingRequest request) {
         log.info("Creating booking for rider: {}", riderId);
 
-        validateCreateBookingRequest(request);
-
+        // Validation is handled by @Valid annotation in controller
+        
         Booking booking = new Booking();
         booking.setRiderId(riderId);
         booking.setPickupLatitude(request.getPickupLatitude());
@@ -42,15 +42,15 @@ public class RiderBookingService {
         booking.setDropoffLongitude(request.getDropoffLongitude());
         booking.setDropoffAddress(request.getDropoffAddress());
 
-
+        // Parse and validate vehicle type
         try {
             booking.setVehicleType(Booking.VehicleType.valueOf(request.getVehicleType().toUpperCase()));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             log.error("Invalid vehicle type: {}", request.getVehicleType());
             throw new InvalidVehicleTypeException(request.getVehicleType(), "AUTO, BIKE, SEDAN, SUV");
         }
 
-
+        // Calculate trip details
         BigDecimal distance = calculateDistance(
                 request.getPickupLatitude(), request.getPickupLongitude(),
                 request.getDropoffLatitude(), request.getDropoffLongitude()
@@ -59,21 +59,18 @@ public class RiderBookingService {
         booking.setFareAmount(calculateFare(distance, booking.getVehicleType()));
         booking.setTripDurationMinutes(calculateDuration(distance));
 
-        // Set initial status
+        // Set initial booking state
         booking.setBookingStatus(Booking.BookingStatus.PENDING);
         booking.setPaymentStatus(Booking.PaymentStatus.PENDING);
         booking.setRequestTime(OffsetDateTime.now());
 
-        // Save via DAO
         Booking savedBooking = riderBookingDao.save(booking);
 
-        log.info("Booking created successfully: {}", savedBooking.getId());
-
-        // TODO: Trigger driver search/assignment
+        log.info("Booking created successfully: {} (Fare: {}, Distance: {} km)", 
+                savedBooking.getId(), savedBooking.getFareAmount(), savedBooking.getTripDistanceKm());
 
         return RiderBookingResponse.fromEntity(savedBooking);
     }
-
 
     @Transactional(readOnly = true)
     public PageResponse<RiderBookingResponse> getMyBookings(
@@ -88,6 +85,8 @@ public class RiderBookingService {
                 riderId, filterType, searchTerm, status);
 
         Page<Booking> bookingsPage;
+
+        // Apply filters
         if (status != null && !status.isBlank()) {
             try {
                 Booking.BookingStatus bookingStatus = Booking.BookingStatus.valueOf(status.toUpperCase());
@@ -97,15 +96,12 @@ public class RiderBookingService {
                 throw new InvalidRequestException("Invalid booking status: " + status + ". Valid values are: PENDING, ACCEPTED, STARTED, COMPLETED, CANCELLED");
             }
         }
-        // Filter by pickup address
         else if ("pickup".equals(filterType) && searchTerm != null && !searchTerm.isBlank()) {
             bookingsPage = riderBookingDao.searchByPickupAddress(riderId, searchTerm, page, size);
         }
-        // Filter by dropoff address
         else if ("dropoff".equals(filterType) && searchTerm != null && !searchTerm.isBlank()) {
             bookingsPage = riderBookingDao.searchByDropoffAddress(riderId, searchTerm, page, size);
         }
-        // Filter by travel date
         else if ("travel_date".equals(filterType) && searchTerm != null && !searchTerm.isBlank()) {
             try {
                 OffsetDateTime date = OffsetDateTime.parse(searchTerm + "T00:00:00Z");
@@ -115,20 +111,20 @@ public class RiderBookingService {
                 throw new InvalidRequestException("Invalid date format. Use YYYY-MM-DD");
             }
         }
-        // No filter - get all
         else {
             bookingsPage = riderBookingDao.findAllByRiderId(riderId, page, size);
         }
 
-        // Convert to response
+        // Convert to response DTOs
         List<RiderBookingResponse> content = bookingsPage.getContent()
                 .stream()
                 .map(RiderBookingResponse::fromEntity)
                 .collect(Collectors.toList());
 
-        // Populate driver details
+        // Populate driver details from User Service
         content = populateDriverDetailsForList(content);
 
+        // Build paginated response
         PageResponse<RiderBookingResponse> response = new PageResponse<>();
         response.setContent(content);
         response.setPage(bookingsPage.getNumber());
@@ -137,6 +133,7 @@ public class RiderBookingService {
         response.setTotalPages(bookingsPage.getTotalPages());
         response.setLast(bookingsPage.isLast());
 
+        log.info("Retrieved {} bookings for rider {}", content.size(), riderId);
         return response;
     }
 
@@ -147,21 +144,26 @@ public class RiderBookingService {
         Booking booking = riderBookingDao.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId, true));
 
+        // Verify ownership
         if (!booking.getRiderId().equals(riderId)) {
+            log.error("Unauthorized cancellation attempt by rider {} for booking {}", riderId, bookingId);
             throw new UnauthorizedAccessException(riderId, bookingId);
         }
 
-        // Can only cancel PENDING or ACCEPTED
+        // Validate cancellable status
         if (booking.getBookingStatus() != Booking.BookingStatus.PENDING &&
                 booking.getBookingStatus() != Booking.BookingStatus.ACCEPTED) {
-            throw new InvalidBookingStatusException("Cannot cancel booking in " + booking.getBookingStatus() + " status");
+            log.error("Cannot cancel booking in {} status", booking.getBookingStatus());
+            throw new InvalidBookingStatusException("Cannot cancel booking in " + booking.getBookingStatus().name().toLowerCase() + " status");
         }
 
+        // Update booking status
         booking.setBookingStatus(Booking.BookingStatus.CANCELLED);
-        booking.setCancelledBy(Booking.CancelledBy.RIDER);
-        booking.setCancellationReason("Cancelled by rider");
+        booking.setUpdatedAt(OffsetDateTime.now());
 
         Booking updated = riderBookingDao.update(booking);
+        log.info("Booking {} cancelled successfully", bookingId);
+
         return RiderBookingResponse.fromEntity(updated);
     }
 
@@ -185,33 +187,13 @@ public class RiderBookingService {
         return populateDriverDetails(response);
     }
 
+    // ==================== HELPER METHODS ====================
 
-    //TODO : Cancel Booking method
-    //TODO : Rate Driver method
-
-
-
-    private void validateCreateBookingRequest(CreateBookingRequest request) {
-        if (request.getPickupLatitude() == null || request.getPickupLongitude() == null) {
-            throw new InvalidRequestException("Pickup location coordinates (latitude and longitude) are required");
-        }
-        if (request.getDropoffLatitude() == null || request.getDropoffLongitude() == null) {
-            throw new InvalidRequestException("Dropoff location coordinates (latitude and longitude) are required");
-        }
-        if (request.getPickupAddress() == null || request.getPickupAddress().isBlank()) {
-            throw new InvalidRequestException("Pickup address is required");
-        }
-        if (request.getDropoffAddress() == null || request.getDropoffAddress().isBlank()) {
-            throw new InvalidRequestException("Dropoff address is required");
-        }
-        if (request.getVehicleType() == null || request.getVehicleType().isBlank()) {
-            throw new InvalidRequestException("Vehicle type is required");
-        }
-    }
-
+    /**
+     * Calculate distance between two coordinates using Haversine formula
+     */
     private BigDecimal calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
-        // Haversine formula
-        final int R = 6371; // Earth radius in km
+        final int EARTH_RADIUS_KM = 6371;
 
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
@@ -221,14 +203,15 @@ public class RiderBookingService {
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        double distance = R * c;
+        double distance = EARTH_RADIUS_KM * c;
 
         return BigDecimal.valueOf(Math.round(distance * 100.0) / 100.0);
     }
 
+    /**
+     * Calculate fare based on distance and vehicle type
+     */
     private BigDecimal calculateFare(BigDecimal distance, Booking.VehicleType vehicleType) {
-        // Base fare + per km rate
         BigDecimal baseFare = switch (vehicleType) {
             case AUTO -> BigDecimal.valueOf(30);
             case BIKE -> BigDecimal.valueOf(20);
@@ -247,13 +230,18 @@ public class RiderBookingService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Calculate estimated trip duration based on distance
+     */
     private Integer calculateDuration(BigDecimal distance) {
         // Assume average speed of 30 km/h
         double hours = distance.doubleValue() / 30.0;
         return (int) Math.round(hours * 60); // Convert to minutes
     }
 
-    // Helper method to fetch and populate driver details
+    /**
+     * Fetch and populate driver details from User Service
+     */
     private RiderBookingResponse populateDriverDetails(RiderBookingResponse response) {
         if (response.getDriverId() != null) {
             try {

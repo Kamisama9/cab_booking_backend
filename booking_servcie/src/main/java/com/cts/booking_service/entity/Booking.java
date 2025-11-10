@@ -8,6 +8,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -84,18 +85,6 @@ public class Booking {
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 
-    @Column(length = 500)
-    private String cancellationReason;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 10)
-    private CancelledBy cancelledBy;
-
-    public enum CancelledBy {
-        RIDER,
-        DRIVER,
-        ADMIN
-    }
 
     private Integer riderRating;      // Driver rates rider (1-5)
     private Integer driverRating;     // Rider rates driver (1-5)
@@ -106,17 +95,23 @@ public class Booking {
     @Column(length = 1000)
     private String driverFeedback;
 
+    @Column(name = "stripe_payment_id")
+private String paymentId;
 
-    private String paymentId;
+@Column(name = "payment_method")
+private String paymentMethod;
 
-    @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private PaymentStatus paymentStatus;
+@Enumerated(EnumType.STRING)
+@Column(name = "payment_status")
+private PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
-    public enum PaymentStatus {
-        PENDING,
-        COMPLETED,
-        FAILED,
-        REFUNDED
-    }
+@Column(name = "paid_at")
+private LocalDateTime paidAt;
+
+// Add this enum inside Booking class
+public enum PaymentStatus {
+    PENDING,
+    COMPLETED,
+    FAILED
+}
 }

@@ -134,7 +134,6 @@ public class UserService {
         userRepository.save(user);
     }
 
-    // ✅ Existing methods (keep for backward compatibility)
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -145,7 +144,6 @@ public class UserService {
         return userRepository.findByRole(role);
     }
 
-    // ✅ NEW: Paginated methods
     @Transactional(readOnly = true)
     public Page<User> getAllUsersPaginated(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());

@@ -52,18 +52,4 @@ public interface DriverBookingRepository extends JpaRepository<Booking, String> 
             "AND b.bookingStatus IN ('ACCEPTED', 'STARTED')")
     boolean hasActiveBooking(@Param("driverId") String driverId);
 
-
-    @Query("SELECT b FROM Booking b WHERE b.driverId = :driverId " +
-            "AND b.createdAt BETWEEN :startDate AND :endDate " +
-            "ORDER BY b.createdAt DESC")
-    List<Booking> findDriverBookingsBetweenDates(
-            @Param("driverId") String driverId,
-            @Param("startDate") OffsetDateTime startDate,
-            @Param("endDate") OffsetDateTime endDate
-    );
-
-
-    @Query("SELECT SUM(b.fareAmount) FROM Booking b WHERE b.driverId = :driverId " +
-            "AND b.bookingStatus = 'COMPLETED'")
-    java.math.BigDecimal getTotalEarningsByDriverId(@Param("driverId") String driverId);
 }

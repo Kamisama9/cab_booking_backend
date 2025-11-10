@@ -83,20 +83,6 @@ public class RiderBookingDaoImpl implements RiderBookingDao {
     }
 
     @Override
-    public long getTotalBookingCount(String riderId) {
-        log.debug("Getting total booking count for rider: {}", riderId);
-        return repository.countByRiderId(riderId);
-    }
-
-    @Override
-    public long getCompletedBookingCount(String riderId) {
-        log.debug("Getting completed booking count for rider: {}", riderId);
-        return repository.countCompletedBookingsByRiderId(riderId);
-    }
-
-    // Add these implementations to RiderBookingDaoImpl
-
-    @Override
     public Page<Booking> findByStatus(Booking.BookingStatus status, Pageable pageable) {
         log.debug("Finding all bookings with status: {}", status);
         return repository.findByBookingStatusOrderByCreatedAtDesc(status, pageable);

@@ -34,12 +34,6 @@ public interface RiderBookingDao {
 
     boolean existsByIdAndRiderId(String bookingId, String riderId);
 
-
-    long getTotalBookingCount(String riderId);
-
-
-    long getCompletedBookingCount(String riderId);
-
     // Add these methods to RiderBookingDao interface
 
     Page<Booking> findByStatus(Booking.BookingStatus status, Pageable pageable);

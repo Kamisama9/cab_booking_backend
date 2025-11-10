@@ -50,14 +50,6 @@ public interface RiderBookingRepository extends JpaRepository<Booking, String> {
             Pageable pageable
     );
 
-
-    @Query("SELECT COUNT(b) FROM Booking b WHERE b.riderId = :riderId")
-    long countByRiderId(@Param("riderId") String riderId);
-
-    @Query("SELECT COUNT(b) FROM Booking b WHERE b.riderId = :riderId " +
-            "AND b.bookingStatus = 'COMPLETED'")
-    long countCompletedBookingsByRiderId(@Param("riderId") String riderId);
-
     Page<Booking> findByBookingStatusOrderByCreatedAtDesc(
             Booking.BookingStatus status,
             Pageable pageable

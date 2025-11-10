@@ -15,8 +15,8 @@ public class RiderBookingResponse {
     private String id;
     private String riderId;
     private String driverId;
-    private String driverName;
-    private String driverPhone;
+    private String driverName;  // Populated from User Service
+    private String driverPhone;  // Populated from User Service
     private String vehicleId;
 
     private String pickupAddress;
@@ -28,16 +28,17 @@ public class RiderBookingResponse {
     private Integer tripDurationMinutes;
 
     private String bookingStatus;
-    private String cancelledBy;
-    private String cancellationReason;
 
-    private Integer driverRating;
-    private String driverFeedback;
+    // Payment Info
+    private String paymentId;  // ADDED: From entity
+    private String paymentStatus;  // ADDED: From entity
 
+    // Timestamps
     private OffsetDateTime requestTime;
     private OffsetDateTime pickupTime;
     private OffsetDateTime dropoffTime;
     private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;  // ADDED: From entity
 
     public static RiderBookingResponse fromEntity(Booking booking) {
         RiderBookingResponse response = new RiderBookingResponse();
@@ -52,14 +53,20 @@ public class RiderBookingResponse {
         response.setTripDistanceKm(booking.getTripDistanceKm());
         response.setTripDurationMinutes(booking.getTripDurationMinutes());
         response.setBookingStatus(booking.getBookingStatus() != null ? booking.getBookingStatus().name().toLowerCase() : null);
-        response.setCancelledBy(booking.getCancelledBy() != null ? booking.getCancelledBy().name() : null);
-        response.setCancellationReason(booking.getCancellationReason());
-        response.setDriverRating(booking.getDriverRating());
-        response.setDriverFeedback(booking.getDriverFeedback());
+        
+
+        
+        // Payment Info
+        response.setPaymentId(booking.getPaymentId());  // ADDED
+        response.setPaymentStatus(booking.getPaymentStatus() != null ? booking.getPaymentStatus().name().toLowerCase() : null);  // ADDED
+        
+        // Timestamps
         response.setRequestTime(booking.getRequestTime());
         response.setPickupTime(booking.getPickupTime());
         response.setDropoffTime(booking.getDropoffTime());
         response.setCreatedAt(booking.getCreatedAt());
+        response.setUpdatedAt(booking.getUpdatedAt());  // ADDED
+        
         return response;
     }
 }

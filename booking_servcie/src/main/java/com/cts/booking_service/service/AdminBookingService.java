@@ -1,7 +1,7 @@
 package com.cts.booking_service.service;
 
 import com.cts.booking_service.client.UserServiceClient;
-import com.cts.booking_service.client.dto.UserResponse;
+import com.cts.booking_service.dto.UserResponse;
 import com.cts.booking_service.dao.RiderBookingDao;
 import com.cts.booking_service.dto.common.PageResponse;
 import com.cts.booking_service.dto.rider.RiderBookingResponse;
@@ -33,28 +33,29 @@ public class AdminBookingService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Booking> bookingsPage;
 
+        // Filter by status if provided
         if (status != null && !status.isBlank()) {
             try {
                 Booking.BookingStatus bookingStatus = Booking.BookingStatus.valueOf(status.toUpperCase());
-                // You'll need to add this method to RiderBookingDao
                 bookingsPage = riderBookingDao.findByStatus(bookingStatus, pageable);
             } catch (IllegalArgumentException e) {
                 log.error("Invalid status: {}", status);
-                throw new RuntimeException("Invalid booking status: " + status);
+                throw new RuntimeException("Invalid booking status: " + status + ". Valid values are: PENDING, ACCEPTED, STARTED, COMPLETED, CANCELLED");
             }
         } else {
-            // Get all bookings - you'll need to add this method
             bookingsPage = riderBookingDao.findAll(pageable);
         }
 
+        // Convert to response DTOs
         List<RiderBookingResponse> content = bookingsPage.getContent()
                 .stream()
                 .map(RiderBookingResponse::fromEntity)
                 .collect(Collectors.toList());
 
-        // Populate driver/rider details
+        // Populate user details
         content = populateUserDetails(content);
 
+        // Build paginated response
         PageResponse<RiderBookingResponse> response = new PageResponse<>();
         response.setContent(content);
         response.setPage(bookingsPage.getNumber());
@@ -63,6 +64,7 @@ public class AdminBookingService {
         response.setTotalPages(bookingsPage.getTotalPages());
         response.setLast(bookingsPage.isLast());
 
+        log.info("Admin retrieved {} bookings", content.size());
         return response;
     }
 
@@ -77,23 +79,33 @@ public class AdminBookingService {
         return populateUserDetails(response);
     }
 
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Populate user details for a list of bookings
+     */
     private List<RiderBookingResponse> populateUserDetails(List<RiderBookingResponse> responses) {
         return responses.stream()
                 .map(this::populateUserDetails)
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Fetch and populate driver details from User Service
+     */
     private RiderBookingResponse populateUserDetails(RiderBookingResponse response) {
-        // Fetch driver name
+        // Fetch driver name and phone
         if (response.getDriverId() != null) {
             try {
                 UserResponse driver = userServiceClient.getUserById(response.getDriverId());
                 if (driver != null) {
                     response.setDriverName(driver.getFirstName() + " " + driver.getLastName());
                     response.setDriverPhone(driver.getPhoneNumber());
+                    log.debug("Fetched driver details for driverId: {}", response.getDriverId());
                 }
             } catch (Exception e) {
-                log.warn("Failed to fetch driver details: {}", e.getMessage());
+                log.warn("Failed to fetch driver details for driverId: {}. Error: {}", 
+                        response.getDriverId(), e.getMessage());
             }
         }
         return response;
